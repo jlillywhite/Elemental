@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace ElementalCore.DataAccess
+namespace Elemental.DataAccess
 {
 	public interface IDataRepository
 	{
