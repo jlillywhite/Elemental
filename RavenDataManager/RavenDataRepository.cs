@@ -5,35 +5,57 @@ using System.Text;
 using Elemental.DataAccess;
 using Raven.Client.Embedded;
 using Raven.Client;
+using System.Web.Caching;
+using System.Web;
+using Raven.Client.Document;
+using System.Configuration;
 
 namespace RavenDataManager
 {
 	public sealed class RavenDataRepository : IDataRepository
 	{
 		IDocumentSession session;
+		Cache cache;
+		int cacheTime = 20;
 
 		public RavenDataRepository()
 		{
-			session = RavenDocumentStore.Instance.OpenSession();
+			session = RavenDocumentStore.Instance.DocStore.OpenSession();
+			cache = HttpRuntime.Cache;
 			OnInit();
 		}
 
 		#region Public Members
 		#region IDataRepository Members
 
-		public T GetOne<T>(string Id) where T : IModel
+		public T GetOne<T>(string id) where T : class, IModel
 		{
 			string message;
-			if (!OnBeforeLoad<T>(Id, out message))
+			T result;
+			if (!OnBeforeLoad<T>(id, out message))
 			{
 				throw new DataAccessException(message);
 			}
-			T result = session.Query<T>().SingleOrDefault(t => t.Id.Equals(Id, StringComparison.InvariantCultureIgnoreCase));
+			lock (cache)
+			{
+				object cacheObject = cache[id];
+				result = cacheObject as T;
+				if (result == null)
+				{
+					if (cacheObject != null)
+					{
+						cache.Remove(id);
+					}
+					result = session.Query<T>().SingleOrDefault(t => t.Id.Equals(id, StringComparison.InvariantCultureIgnoreCase));
+					AddToCache(result);
+				}
+			}
 			OnLoad(result);
 			return result;
 		}
 
-		public T GetOne<T>(Func<T, bool> filterFunction) where T : IModel
+
+		public T GetOne<T>(Func<T, bool> filterFunction) where T : class, IModel
 		{
 			string message;
 			T result = session.Query<T>().SingleOrDefault(filterFunction);
@@ -41,49 +63,59 @@ namespace RavenDataManager
 			{
 				throw new DataAccessException(message);
 			}
+			AddToCache(result);
 			OnLoad(result);
 			return result;
 		}
 
-		public IEnumerable<T> GetAll<T>() where T : IModel
+		public IEnumerable<T> GetAll<T>() where T : class, IModel
 		{
 			string message;
 			IEnumerable<T> results = session.Query<T>();
-			foreach(T result in results){
+			foreach (T result in results)
+			{
 				if (OnBeforeLoad<T>(result.Id, out message))
 				{
+					AddToCache(result);
 					OnLoad(result);
 					yield return result;
 				}
 			}
 		}
 
-		public IEnumerable<T> Get<T>(Func<T, bool> filterFunction) where T : IModel
+		public IEnumerable<T> Get<T>(Func<T, bool> filterFunction) where T : class, IModel
 		{
 			string message;
 			IEnumerable<T> results = session.Query<T>().Where(filterFunction);
-			foreach(T result in results){
+			foreach (T result in results)
+			{
 				if (OnBeforeLoad<T>(result.Id, out message))
 				{
+					AddToCache(result);
 					OnLoad(result);
 					yield return result;
 				}
-			} 
+			}
 		}
 
-		public void Save<T>(T modelToSave) where T : IModel
+		public void Save<T>(T modelToSave) where T : class, IModel
 		{
 			string message;
 			if (!OnBeforeSave(modelToSave, out message))
 			{
 				throw new DataAccessException(message);
 			}
+			if (modelToSave.Id.Length == 0)
+			{
+				modelToSave.Id = modelToSave.CollectionName + "/";
+			}
 			session.Store(modelToSave);
 			session.SaveChanges();
+			AddToCache(modelToSave);
 			OnSave(modelToSave);
 		}
 
-		public void Delete<T>(T modelToDelete) where T : IModel
+		public void Delete<T>(T modelToDelete) where T : class, IModel
 		{
 			string message;
 			if (!OnBeforeDelete(modelToDelete, out message))
@@ -92,6 +124,13 @@ namespace RavenDataManager
 			}
 			session.Delete<T>(modelToDelete);
 			session.SaveChanges();
+			lock (cache)
+			{
+				if (cache[modelToDelete.Id] != null)
+				{
+					cache.Remove(modelToDelete.Id);
+				}
+			}
 			OnDelete(modelToDelete);
 		}
 		public event BeforeLoadEventHandler BeforeLoad;
@@ -112,6 +151,20 @@ namespace RavenDataManager
 		#endregion
 
 		#region Private Members
+		private void AddToCache<T>(T result) where T : class, IModel
+		{
+			lock (cache)
+			{
+				if (cache[result.Id] != null)
+				{
+					cache[result.Id] = result;
+				}
+				else
+				{
+					cache.Add(result.Id, result, null, System.Web.Caching.Cache.NoAbsoluteExpiration, new TimeSpan(0, cacheTime, 0), CacheItemPriority.Low, null);
+				}
+			}
+		}
 
 		private void OnInit()
 		{
@@ -128,7 +181,8 @@ namespace RavenDataManager
 			message = string.Empty;
 			if (BeforeLoad != null)
 			{
-				BeforeLoadEventArgs  args = new BeforeLoadEventArgs{
+				BeforeLoadEventArgs args = new BeforeLoadEventArgs
+				{
 					ObjectId = objectID
 				};
 				result = BeforeLoad(this, args, out message);
@@ -203,21 +257,52 @@ namespace RavenDataManager
 			}
 		}
 
-		private class RavenDocumentStore
+		private class RavenDocumentStore : IDisposable
 		{
-			private static EmbeddableDocumentStore instance = new EmbeddableDocumentStore
-			{
-				DataDirectory = "Elemental"
-			};
+			private static object lockObj = new object();
+			private static volatile RavenDocumentStore instance;
 
-			public static EmbeddableDocumentStore Instance
+			public static RavenDocumentStore Instance
 			{
 				get
 				{
+					if (instance == null)
+					{
+						lock (lockObj)
+						{
+							if (instance == null)
+							{
+								instance = new RavenDocumentStore();
+							}
+						}
+					}
 					return instance;
 				}
 			}
 
+			private RavenDocumentStore()
+			{
+				string dataDirectory = ConfigurationManager.ConnectionStrings["Elemental"].ConnectionString;
+				DocStore = new EmbeddableDocumentStore
+				{
+					DataDirectory = dataDirectory
+				};
+				DocStore.Initialize();
+
+			}
+
+			public EmbeddableDocumentStore DocStore { get; private set; }
+
+
+
+			#region IDisposable Members
+
+			public void Dispose()
+			{
+				DocStore.Dispose();
+			}
+
+			#endregion
 		}
 		#endregion
 	}

@@ -8,17 +8,17 @@ namespace Elemental.DataAccess.Configuration
 {
 	public class RepositorySection : ConfigurationSection
 	{
-		[ConfigurationProperty("repository")]
-		public RepositoryElementCollection Handlers
+		[ConfigurationProperty("repositories")]
+		public RepositoryElementCollection Repositories
 		{
 			get
 			{
-				return (RepositoryElementCollection)this["repository"] ??
+				return (RepositoryElementCollection)this["repositories"] ??
 					new RepositoryElementCollection();
 			}
 			set
 			{
-				this["repository"] = value;
+				this["repositories"] = value;
 			}
 		}
 	}

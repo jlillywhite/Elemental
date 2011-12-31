@@ -28,31 +28,6 @@ namespace Elemental.DataAccess.Configuration
 			}
 		}
 
-		/// <summary>
-		/// This attribute designates which assembly contains the implementation of the handler.
-		/// The attribute should contain the simple name of the assembly, not the full name.
-		/// </summary>
-		[ConfigurationProperty("assembly", IsRequired = true)]
-		[CallbackValidator(CallbackMethodName = "ValidateAssembly", Type = typeof(RepositoryElement))]
-		public string AssemblyName
-		{
-			get
-			{
-				return (string)this["assembly"];
-			}
-			set
-			{
-				this["assembly"] = value;
-			}
-		}
-
-		public Assembly Assembly
-		{
-			get
-			{
-				return Registry.Current.Assemblies.FirstOrDefault(assembly => assembly.FullName.Split(',')[0] == AssemblyName);
-			}
-		}
 
 		[ConfigurationProperty("type", IsRequired = true)]
 		public string TypeName
@@ -71,43 +46,20 @@ namespace Elemental.DataAccess.Configuration
 		{
 			get
 			{
-				System.Reflection.Assembly asm = Assembly;
-				if (asm != null)
+				Type result;
+				try
 				{
-					Type result;
-					try
-					{
-						result = asm.GetType((string)this["type"]);
-					}
-					catch (TypeLoadException ex)
-					{
-						throw new ArgumentException(string.Format(Resources.ErrorMessages.UnableToLoadHandlerType, this["type"].ToString()), ex);
-					}
-					return result;
+					result = Type.GetType((string)this["type"]);
 				}
-				else
+				catch (TypeLoadException ex)
 				{
-					throw new ArgumentException(string.Format(Resources.ErrorMessages.UnableToLoadHandlerAssembly, AssemblyName));
+					throw new ArgumentException(string.Format(Resources.ErrorMessages.UnableToLoadHandlerType, this["type"].ToString()), ex);
 				}
+				return result;
 			}
 			set
 			{
 				this["type"] = value.Name;
-			}
-		}
-
-		/// <summary>
-		/// This method validates the "assembly" attribute.  If the attribute is invalid, it will throw an ArgumentException.
-		/// </summary>
-		/// <param name="value"></param>
-		public static void ValidateAssembly(object value)
-		{
-			if (!string.IsNullOrEmpty((string)value))
-			{
-				if (!Registry.Current.Assemblies.Any(assembly => assembly.FullName.Split(',')[0] == (string)value))
-				{
-					throw new ArgumentException(Resources.ErrorMessages.InvalidAssembly);
-				}
 			}
 		}
 	}

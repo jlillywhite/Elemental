@@ -9,5 +9,6 @@ namespace Elemental.DataAccess
 	{
 		string Id { get; set; }
 
+		string CollectionName { get; set; }
 	}
 }
