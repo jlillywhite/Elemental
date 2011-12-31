@@ -98,21 +98,18 @@ namespace RavenDataManager
 			}
 		}
 
-		public void Save<T>(T modelToSave) where T : class, IModel
+		public string Save<T>(T modelToSave) where T : class, IModel
 		{
 			string message;
 			if (!OnBeforeSave(modelToSave, out message))
 			{
 				throw new DataAccessException(message);
 			}
-			if (modelToSave.Id.Length == 0)
-			{
-				modelToSave.Id = modelToSave.CollectionName + "/";
-			}
 			session.Store(modelToSave);
 			session.SaveChanges();
 			AddToCache(modelToSave);
 			OnSave(modelToSave);
+			return modelToSave.Id;
 		}
 
 		public void Delete<T>(T modelToDelete) where T : class, IModel

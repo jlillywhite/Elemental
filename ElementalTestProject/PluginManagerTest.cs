@@ -17,5 +17,6 @@ namespace ElementalTestProject
 			IDataRepository repository = PluginManager.Instance.DataRepository;
 			Assert.IsNotNull(repository);
 		}
+
 	}
 }

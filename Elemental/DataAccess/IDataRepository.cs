@@ -18,7 +18,7 @@ namespace Elemental.DataAccess
 		IEnumerable<T> Get<T>(Func<T, bool> filterFunction)
 			where T : class, IModel;
 
-		void Save<T>(T modelToSave)
+		string Save<T>(T modelToSave)
 			where T : class, IModel;
 
 		void Delete<T>(T modelToDelete)

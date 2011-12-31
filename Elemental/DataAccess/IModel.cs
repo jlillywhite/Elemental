@@ -8,7 +8,5 @@ namespace Elemental.DataAccess
 	public interface IModel
 	{
 		string Id { get; set; }
-
-		string CollectionName { get; set; }
 	}
 }

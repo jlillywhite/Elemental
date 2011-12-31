@@ -33,6 +33,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Raven.Storage.Esent">
+      <HintPath>..\RavenEmbeddedClient\Raven.Storage.Esent.dll</HintPath>
+    </Reference>
     <Reference Include="System.Data.Entity" />
     <Reference Include="System.Web.Mvc, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL" />
     <Reference Include="System.Web.WebPages, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL" />
@@ -75,6 +78,10 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>ErrorMessages.resx</DependentUpon>
     </Compile>
+    <Compile Include="Routing\Configuration\IgnoredRouteElement.cs" />
+    <Compile Include="Routing\Configuration\IgnoredRouteElementCollection.cs" />
+    <Compile Include="Routing\Configuration\IgnoredRoutesSection.cs" />
+    <Compile Include="Routing\IgnoredRoute.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Global.asax" />
@@ -89,7 +96,8 @@
     <Folder Include="App_Data\" />
     <Folder Include="Content\" />
     <Folder Include="Controllers\" />
-    <Folder Include="Models\" />
+    <Folder Include="DataAccess\DataModels\" />
+    <Folder Include="Models\ViewModels\" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\ErrorMessages.resx">
